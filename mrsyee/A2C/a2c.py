@@ -7,17 +7,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from matplotlib import animation
 
 from torch.distributions import Normal
-
-if torch.backends.cudnn.enabled:
-    torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.deterministic = True
-
-seed = 777
-torch.manual_seed(seed)
-np.random.seed(seed)
-random.seed(seed)
+from torch.utils.tensorboard import SummaryWriter
 
 
 def initialize_uniformly(layer: nn.Linear, init_w: float = 3e-3):
@@ -84,6 +77,7 @@ class A2CAgent(object):
         self.transition: list = list()
 
         self.total_step = 0
+        self.writer = SummaryWriter('tensorboard')
 
         self.is_test = False
 
@@ -154,8 +148,10 @@ class A2CAgent(object):
                 score = 0
 
             if self.total_step % plotting_interval == 0:
-                self._plot(self.total_step, scores, actor_losses, critic_losses)
+                # self._plot(self.total_step, scores, actor_losses, critic_losses)
+                self._log(self.total_step, scores, actor_losses, critic_losses)
 
+        self._plot(self.total_step, scores, actor_losses, critic_losses)
         self.env.close()
 
     def test(self):
@@ -179,6 +175,22 @@ class A2CAgent(object):
 
         return frames
 
+    def _log(self,
+             frame_idx: int,
+             scores: List[float],
+             actor_losses: List[float],
+             critic_losses: List[float],
+             ):
+        """logging the training progresses."""
+        actor_loss = np.mean(actor_losses[-10:])
+        critic_loss = np.mean(critic_losses[-10:])
+        score = np.mean(scores[-10:])
+        self.writer.add_scalar('actor_loss', actor_loss, global_step=frame_idx)
+        self.writer.add_scalar('critic_loss', critic_loss, global_step=frame_idx)
+        self.writer.add_scalar('score', score, global_step=frame_idx)
+        print(
+            "frame: {} | Score: {} | ActorLoss: {} | CriticLoss: {}".format(frame_idx, score, actor_loss, critic_loss))
+
     def _plot(self, frame_idx: int, scores: List[float], actor_losses: List[float], critic_losses: List[float]):
         def subplot(loc: int, title: str, values: List[float]):
             plt.subplot(loc)
@@ -199,6 +211,28 @@ class A2CAgent(object):
 
 
 if __name__ == '__main__':
+    def frame_gif(frames: List[np.ndarray]) -> None:
+        patch = plt.imshow(frames[0])
+        plt.axis('off')
+
+        def animate(i):
+            patch.set_data(frames[i])
+
+        anim = animation.FuncAnimation(
+            plt.gcf(), animate, frames=len(frames), interval=50
+        )
+        plt.show()
+
+
+    if torch.backends.cudnn.enabled:
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = True
+
+    seed = 777
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
     num_frames = 100000
     gamma = 0.9
     entropy_weight = 1e-2
@@ -212,3 +246,4 @@ if __name__ == '__main__':
 
     frames = agent.test()
 
+    frame_gif(frames)
