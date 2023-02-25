@@ -453,7 +453,7 @@ if __name__ == '__main__':
     np.random.seed(seed)
     random.seed(seed)
 
-    env_id = "Pendulum-v0"
+    env_id = "Pendulum-v1"
     env = gym.make(env_id)
     env = ActionNormalizer(env)
     env.seed(seed)
